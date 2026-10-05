@@ -1634,7 +1634,6 @@ html&gt;body{padding:0}&lt;/style&gt;
       &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;pz-shuffle&quot;&gt;换个能解的局面&lt;/button&gt;
       &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;pz-hint&quot;&gt;提示&lt;/button&gt;
       &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;pz-why-btn&quot; aria-pressed=&quot;false&quot;&gt;揭晓为什么&lt;/button&gt;
-      &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;pz-opt-btn&quot; aria-pressed=&quot;false&quot;&gt;最优解是怎么算出来的&lt;/button&gt;
     &lt;/div&gt;
   &lt;/div&gt;
 
@@ -1666,20 +1665,6 @@ html&gt;body{padding:0}&lt;/style&gt;
        “只差一次对换”的局面正好落在另一个陪集。&lt;/p&gt;
   &lt;/div&gt;
 
-  &lt;div class=&quot;text-small text-muted&quot; id=&quot;pz-opt&quot; hidden&gt;
-    &lt;p&gt;把&quot;局面&quot;看成图上的点、一次滑动看成一条边，从当前局面到目标局面的最短路径就是最优解。&lt;/p&gt;
-    &lt;ol&gt;
-      &lt;li&gt;直接广度优先（BFS）一定能得到最优解，但 4×4 的局面总数是 16!/2 ≈ 1.05×10¹³，全部展开不现实。&lt;/li&gt;
-      &lt;li&gt;所以用 A*：给每个局面算 f = g + h，g 是已经走的步数，h 是对&quot;还差多少步&quot;的估计，每次挑 f 最小的继续展开。&lt;/li&gt;
-      &lt;li&gt;h 必须&quot;乐观&quot;——永不高估真实步数。满足这一点时，A* 第一次碰到目标局面时的 g 就是最少步数。页面上用了两种经典乐观估计：
-          曼哈顿距离（每块到目标位置的横竖距离之和）和线性冲突（同一行或同一列里两块互相挡路时，至少要多绕 2 步）。&lt;/li&gt;
-      &lt;li&gt;页面只取这条最优路径的第一步当提示；每点一次提示都按当前局面重算，所以中间乱走也不会被带偏。&lt;/li&gt;
-      &lt;li&gt;想做&quot;查表&quot;式的版本，业界标准是 IDA* ＋ 模式数据库（pattern database）：把 15 块拆成几组（例如 1–7 和 8–15），
-          对每组单独搜出&quot;到目标状态的最少步数&quot;存成表；每个局面查表得到一个乐观下界，几张表加起来（或取最大）交给 IDA* 剪枝。
-          表越大越准，搜索越快。&lt;/li&gt;
-      &lt;li&gt;一句话：表提供乐观下界，搜索用下界剪枝，最优性由&quot;乐观&quot;保证。Korf 在 1985 年用这套方法算出了一批随机局面的最优解（平均 53 步左右）。&lt;/li&gt;
-    &lt;/ol&gt;
-  &lt;/div&gt;
 
   &lt;script&gt;
     (function () {
@@ -1705,8 +1690,6 @@ html&gt;body{padding:0}&lt;/style&gt;
       var hintEl = document.getElementById(&quot;pz-hint-text&quot;);
       var whyEl = document.getElementById(&quot;pz-why&quot;);
       var whyBtn = document.getElementById(&quot;pz-why-btn&quot;);
-      var optEl = document.getElementById(&quot;pz-opt&quot;);
-      var optBtn = document.getElementById(&quot;pz-opt-btn&quot;);
 
       function blankIndex(b) {
         return b.indexOf(0);
@@ -1958,12 +1941,6 @@ html&gt;body{padding:0}&lt;/style&gt;
         whyBtn.className = &quot;btn&quot; + (open ? &quot; btn-primary&quot; : &quot;&quot;);
       });
 
-      optBtn.addEventListener(&quot;click&quot;, function () {
-        var open = optEl.hidden;
-        optEl.hidden = !open;
-        optBtn.setAttribute(&quot;aria-pressed&quot;, open ? &quot;true&quot; : &quot;false&quot;);
-        optBtn.className = &quot;btn&quot; + (open ? &quot; btn-primary&quot; : &quot;&quot;);
-      });
 
       render();
     })();
