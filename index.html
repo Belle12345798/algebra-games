@@ -1539,35 +1539,78 @@ html&gt;body{padding:0}&lt;/style&gt;
 &lt;/script&gt;
 &lt;div id=&quot;puzzle-lab&quot;&gt;
   &lt;style&gt;
+    #puzzle-lab .pz-board {
+      position: relative;
+      border-radius: 16px;
+      padding: 14px;
+      max-width: 348px;
+      background:
+        radial-gradient(120% 90% at 12% 0%, color-mix(in srgb, var(--viz-series-1) 34%, transparent), transparent 62%),
+        radial-gradient(110% 90% at 100% 100%, color-mix(in srgb, var(--viz-series-2, var(--viz-series-1)) 28%, transparent), transparent 58%),
+        radial-gradient(80% 70% at 50% 45%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 72%),
+        var(--muted);
+      transition: background 600ms ease;
+    }
+    #puzzle-lab .pz-board::before {
+      content: &quot;&quot;;
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      background-image:
+        linear-gradient(to right, color-mix(in srgb, var(--foreground) 7%, transparent) 1px, transparent 1px),
+        linear-gradient(to bottom, color-mix(in srgb, var(--foreground) 7%, transparent) 1px, transparent 1px);
+      background-size: 26px 26px, 26px 26px;
+      mask-image: radial-gradient(120% 100% at 50% 50%, black, transparent 78%);
+    }
+    #puzzle-lab.is-solved .pz-board {
+      background:
+        radial-gradient(120% 90% at 12% 0%, color-mix(in srgb, var(--viz-series-1) 54%, transparent), transparent 66%),
+        radial-gradient(110% 90% at 100% 100%, color-mix(in srgb, var(--viz-series-2, var(--viz-series-1)) 48%, transparent), transparent 62%),
+        radial-gradient(80% 70% at 50% 45%, color-mix(in srgb, var(--accent) 36%, transparent), transparent 74%),
+        var(--muted);
+      animation: pz-glow 1200ms ease-out 1;
+    }
+    @keyframes pz-glow {
+      0% { filter: brightness(1); }
+      35% { filter: brightness(1.22); }
+      100% { filter: brightness(1); }
+    }
     #puzzle-lab .pz-grid {
+      position: relative;
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 6px;
-      max-width: 320px;
-      width: 100%;
+      gap: 7px;
     }
     #puzzle-lab .pz-tile {
       aspect-ratio: 1 / 1;
       padding: 0;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: color-mix(in srgb, var(--viz-series-1) 14%, transparent);
+      border: 1px solid color-mix(in srgb, var(--foreground) 14%, transparent);
+      border-radius: 9px;
+      background: color-mix(in srgb, var(--card) 76%, transparent);
       color: var(--foreground);
       font: inherit;
       font-size: 15px;
       font-variant-numeric: tabular-nums;
+      box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 10%, transparent);
+      transition: background 180ms ease, border-color 180ms ease, transform 120ms ease;
     }
     #puzzle-lab .pz-tile.is-movable {
-      border-color: color-mix(in srgb, var(--viz-series-1) 55%, var(--border));
+      border-color: color-mix(in srgb, var(--viz-series-1) 62%, transparent);
+      background: color-mix(in srgb, var(--viz-series-1) 18%, var(--card));
+    }
+    #puzzle-lab .pz-tile.is-hint {
+      border-color: var(--primary);
+      background: color-mix(in srgb, var(--primary) 32%, transparent);
+      transform: scale(1.04);
     }
     #puzzle-lab .pz-tile.is-blank {
-      background: var(--muted);
+      background: transparent;
       border-style: dashed;
-      border-color: var(--border);
+      border-color: color-mix(in srgb, var(--foreground) 22%, transparent);
+      box-shadow: none;
     }
-    #puzzle-lab .pz-tile:disabled {
-      opacity: 1;
-    }
+    #puzzle-lab .pz-tile:disabled { opacity: 1; }
     #puzzle-lab .pz-status {
       display: flex;
       flex-wrap: wrap;
@@ -1580,23 +1623,32 @@ html&gt;body{padding:0}&lt;/style&gt;
       gap: 8px;
       align-items: center;
     }
+    #puzzle-lab .pz-win {
+      color: var(--foreground);
+    }
   &lt;/style&gt;
 
   &lt;div class=&quot;viz-controls&quot;&gt;
     &lt;div class=&quot;pz-row&quot;&gt;
       &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;pz-swap&quot;&gt;两块互换的局面&lt;/button&gt;
       &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;pz-shuffle&quot;&gt;换个能解的局面&lt;/button&gt;
+      &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;pz-hint&quot;&gt;提示&lt;/button&gt;
       &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;pz-why-btn&quot; aria-pressed=&quot;false&quot;&gt;揭晓为什么&lt;/button&gt;
     &lt;/div&gt;
   &lt;/div&gt;
 
-  &lt;div class=&quot;pz-grid&quot; id=&quot;pz-grid&quot; role=&quot;group&quot; aria-label=&quot;15 谜题&quot;&gt;&lt;/div&gt;
+  &lt;div class=&quot;pz-board&quot;&gt;
+    &lt;div class=&quot;pz-grid&quot; id=&quot;pz-grid&quot; role=&quot;group&quot; aria-label=&quot;15 谜题&quot;&gt;&lt;/div&gt;
+  &lt;/div&gt;
 
   &lt;p class=&quot;pz-status text-small&quot; aria-live=&quot;polite&quot;&gt;
     &lt;span&gt;步数 &lt;span class=&quot;tabular-nums&quot; id=&quot;pz-moves&quot;&gt;0&lt;/span&gt;&lt;/span&gt;
+    &lt;span&gt;最少 &lt;span class=&quot;tabular-nums&quot; id=&quot;pz-best&quot;&gt;—&lt;/span&gt;&lt;/span&gt;
     &lt;span&gt;不变量 &lt;span class=&quot;tabular-nums&quot; id=&quot;pz-inv&quot;&gt;0&lt;/span&gt;（目标局面是 1）&lt;/span&gt;
-    &lt;span id=&quot;pz-msg&quot;&gt;&lt;/span&gt;
   &lt;/p&gt;
+
+  &lt;p class=&quot;text-small&quot; id=&quot;pz-msg&quot; aria-live=&quot;polite&quot;&gt;&lt;/p&gt;
+  &lt;p class=&quot;text-small text-muted&quot; id=&quot;pz-hint-text&quot; aria-live=&quot;polite&quot; hidden&gt;&lt;/p&gt;
 
   &lt;div class=&quot;text-small text-muted&quot; id=&quot;pz-why&quot; hidden&gt;
     &lt;p&gt;一句话：这个局面是奇置换，而所有能滑到的局面都是偶置换，奇偶性对不上。&lt;/p&gt;
@@ -1619,24 +1671,31 @@ html&gt;body{padding:0}&lt;/style&gt;
       if (!root) return;
 
       var GOAL = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0];
+      var GOAL_KEY = GOAL.join(&quot;,&quot;);
       var SWAPPED = GOAL.slice();
       SWAPPED[13] = 15;
       SWAPPED[14] = 14;
 
       var board = SWAPPED.slice();
       var moves = 0;
+      var best = null;
+      var hintStep = 0;
+      var hintTile = -1;
+
       var gridEl = document.getElementById(&quot;pz-grid&quot;);
       var movesEl = document.getElementById(&quot;pz-moves&quot;);
+      var bestEl = document.getElementById(&quot;pz-best&quot;);
       var invEl = document.getElementById(&quot;pz-inv&quot;);
       var msgEl = document.getElementById(&quot;pz-msg&quot;);
+      var hintEl = document.getElementById(&quot;pz-hint-text&quot;);
       var whyEl = document.getElementById(&quot;pz-why&quot;);
       var whyBtn = document.getElementById(&quot;pz-why-btn&quot;);
 
-      function blankIndex() {
-        return board.indexOf(0);
+      function blankIndex(b) {
+        return b.indexOf(0);
       }
 
-      function neighborIndexes(i) {
+      function neighborsOf(i) {
         var r = Math.floor(i / 4);
         var c = i % 4;
         var out = [];
@@ -1647,10 +1706,8 @@ html&gt;body{padding:0}&lt;/style&gt;
         return out;
       }
 
-      function inversions() {
-        var seq = board.filter(function (v) {
-          return v !== 0;
-        });
+      function inversions(b) {
+        var seq = b.filter(function (v) { return v !== 0; });
         var n = 0;
         for (var i = 0; i &lt; seq.length; i++) {
           for (var j = i + 1; j &lt; seq.length; j++) {
@@ -1660,24 +1717,127 @@ html&gt;body{padding:0}&lt;/style&gt;
         return n;
       }
 
-      function invariant() {
-        var rowFromBottom = 4 - Math.floor(blankIndex() / 4);
-        return (inversions() + rowFromBottom) % 2;
+      function invariant(b) {
+        var rowFromBottom = 4 - Math.floor(blankIndex(b) / 4);
+        return (inversions(b) + rowFromBottom) % 2;
       }
 
-      function isSolvable() {
-        return invariant() === 1;
+      function isSolvable(b) {
+        return invariant(b) === 1;
       }
 
-      function solved() {
-        return board.every(function (v, i) {
-          return v === GOAL[i];
-        });
+      function isSolved(b) {
+        return b.join(&quot;,&quot;) === GOAL_KEY;
+      }
+
+      function manhattan(b) {
+        var s = 0;
+        for (var i = 0; i &lt; 16; i++) {
+          var v = b[i];
+          if (!v) continue;
+          var g = v - 1;
+          s += Math.abs(Math.floor(i / 4) - Math.floor(g / 4)) + Math.abs(i % 4 - g % 4);
+        }
+        return s;
+      }
+
+      function linearConflict(b) {
+        var lc = 0;
+        var r, c, i, j, a, d;
+        for (r = 0; r &lt; 4; r++) {
+          for (i = 0; i &lt; 4; i++) {
+            a = b[r * 4 + i];
+            if (!a || Math.floor((a - 1) / 4) !== r) continue;
+            for (j = i + 1; j &lt; 4; j++) {
+              d = b[r * 4 + j];
+              if (!d || Math.floor((d - 1) / 4) !== r) continue;
+              if (a &gt; d) lc += 2;
+            }
+          }
+        }
+        for (c = 0; c &lt; 4; c++) {
+          for (i = 0; i &lt; 4; i++) {
+            a = b[i * 4 + c];
+            if (!a || (a - 1) % 4 !== c) continue;
+            for (j = i + 1; j &lt; 4; j++) {
+              d = b[j * 4 + c];
+              if (!d || (d - 1) % 4 !== c) continue;
+              if (a &gt; d) lc += 2;
+            }
+          }
+        }
+        return lc;
+      }
+
+      function heuristic(b) {
+        return manhattan(b) + linearConflict(b);
+      }
+
+      function Heap() {
+        this.a = [];
+      }
+      Heap.prototype.push = function (x) {
+        var a = this.a;
+        a.push(x);
+        var i = a.length - 1;
+        while (i &gt; 0) {
+          var p = (i - 1) &gt;&gt; 1;
+          if (a[p].f &lt;= a[i].f) break;
+          var t = a[p]; a[p] = a[i]; a[i] = t;
+          i = p;
+        }
+      };
+      Heap.prototype.pop = function () {
+        var a = this.a;
+        var top = a[0];
+        var last = a.pop();
+        if (a.length) {
+          a[0] = last;
+          var i = 0;
+          for (;;) {
+            var l = 2 * i + 1, r = l + 1, m = i;
+            if (l &lt; a.length &amp;&amp; a[l].f &lt; a[m].f) m = l;
+            if (r &lt; a.length &amp;&amp; a[r].f &lt; a[m].f) m = r;
+            if (m === i) break;
+            var t = a[m]; a[m] = a[i]; a[i] = t;
+            i = m;
+          }
+        }
+        return top;
+      };
+
+      function solveFirstMove(start, nodeCap) {
+        if (isSolved(start)) return null;
+        var open = new Heap();
+        var seen = new Map();
+        seen.set(start.join(&quot;,&quot;), 0);
+        open.push({ b: start, g: 0, f: heuristic(start), first: -1 });
+        var nodes = 0;
+        while (open.a.length &amp;&amp; nodes &lt; nodeCap) {
+          var cur = open.pop();
+          nodes += 1;
+          var blank = blankIndex(cur.b);
+          var nb = neighborsOf(blank);
+          for (var k = 0; k &lt; nb.length; k++) {
+            var next = cur.b.slice();
+            next[blank] = next[nb[k]];
+            next[nb[k]] = 0;
+            var key = next.join(&quot;,&quot;);
+            var g = cur.g + 1;
+            var prev = seen.get(key);
+            if (prev !== undefined &amp;&amp; prev &lt;= g) continue;
+            seen.set(key, g);
+            var first = cur.first === -1 ? nb[k] : cur.first;
+            if (key === GOAL_KEY) return first;
+            open.push({ b: next, g: g, f: g + heuristic(next), first: first });
+          }
+        }
+        return null;
       }
 
       function render() {
-        var b = blankIndex();
-        var movable = neighborIndexes(b);
+        var blank = blankIndex(board);
+        var movable = neighborsOf(blank);
         gridEl.innerHTML = &quot;&quot;;
         board.forEach(function (v, i) {
           var cell = document.createElement(&quot;button&quot;);
@@ -1687,40 +1847,49 @@ html&gt;body{padding:0}&lt;/style&gt;
             cell.className += &quot; is-blank&quot;;
             cell.disabled = true;
             cell.setAttribute(&quot;aria-label&quot;, &quot;空格&quot;);
-            cell.textContent = &quot;&quot;;
           } else {
             if (movable.indexOf(i) &gt;= 0) cell.className += &quot; is-movable&quot;;
+            if (i === hintTile) cell.className += &quot; is-hint&quot;;
             cell.textContent = String(v);
             cell.setAttribute(&quot;aria-label&quot;, &quot;第&quot; + (Math.floor(i / 4) + 1) + &quot;行第&quot; + (i % 4 + 1) + &quot;列，数字 &quot; + v);
-            cell.addEventListener(&quot;click&quot;, function () {
-              slide(i);
-            });
+            cell.addEventListener(&quot;click&quot;, function () { slide(i); });
           }
           gridEl.appendChild(cell);
         });
         movesEl.textContent = String(moves);
-        invEl.textContent = String(invariant());
-        if (solved()) {
-          msgEl.textContent = &quot;解开了。&quot;;
-        } else if (!isSolvable()) {
-          msgEl.textContent = &quot;这个局面回不到目标。&quot;;
+        invEl.textContent = String(invariant(board));
+
+        var won = isSolved(board);
+        root.className = won ? &quot;is-solved&quot; : &quot;&quot;;
+        if (won) {
+          if (best === null || moves &lt; best) best = moves;
+          bestEl.textContent = String(best);
+          msgEl.className = &quot;text-small pz-win&quot;;
+          msgEl.textContent = &quot;🎉 通关！用了 &quot; + moves + &quot; 步（本次最少 &quot; + best +
+            &quot; 步）。上面那个“两块互换”的局面是永远做不到的。&quot;;
         } else {
-          msgEl.textContent = &quot;&quot;;
+          bestEl.textContent = best === null ? &quot;—&quot; : String(best);
+          msgEl.className = &quot;text-small&quot;;
+          msgEl.textContent = isSolvable(board) ? &quot;这个局面是可解的。&quot; : &quot;这个局面回不到目标。&quot;;
         }
       }
 
       function slide(i) {
-        var b = blankIndex();
-        if (neighborIndexes(b).indexOf(i) &lt; 0) return;
-        board[b] = board[i];
+        var blank = blankIndex(board);
+        if (neighborsOf(blank).indexOf(i) &lt; 0) return;
+        board[blank] = board[i];
         board[i] = 0;
         moves += 1;
+        hintTile = -1;
         render();
       }
 
       function setBoard(next) {
         board = next.slice();
         moves = 0;
+        hintStep = 0;
+        hintTile = -1;
+        hintEl.hidden = true;
         render();
       }
 
@@ -1731,17 +1900,43 @@ html&gt;body{padding:0}&lt;/style&gt;
       document.getElementById(&quot;pz-shuffle&quot;).addEventListener(&quot;click&quot;, function () {
         var b = GOAL.slice();
         var prev = -1;
-        for (var k = 0; k &lt; 80; k++) {
-          var blank = b.indexOf(0);
-          var opts = neighborIndexes(blank).filter(function (x) {
-            return x !== prev;
-          });
+        for (var k = 0; k &lt; 60; k++) {
+          var blank = blankIndex(b);
+          var opts = neighborsOf(blank).filter(function (x) { return x !== prev; });
           var pick = opts[Math.floor(Math.random() * opts.length)];
           b[blank] = b[pick];
           b[pick] = 0;
           prev = blank;
         }
         setBoard(b);
+      });
+
+      document.getElementById(&quot;pz-hint&quot;).addEventListener(&quot;click&quot;, function () {
+        hintStep = (hintStep % 3) + 1;
+        hintEl.hidden = false;
+        if (hintStep === 1) {
+          hintTile = -1;
+          hintEl.textContent = &quot;提示 1／3：先看右下角的“不变量”。目标局面是 1，当前是 &quot; +
+            invariant(board) + &quot;。能不能滑回去，看的就是这个数。&quot;;
+        } else if (hintStep === 2) {
+          if (!isSolvable(board)) {
+            hintTile = -1;
+            hintEl.textContent = &quot;提示 2／3：这个局面的不变量是 0，怎么滑都变不成 1——别硬练，点“换个能解的局面”。&quot;;
+          } else {
+            var first = solveFirstMove(board, 200000);
+            if (first !== null) {
+              hintTile = first;
+              hintEl.textContent = &quot;提示 2／3：这是某一条解法里的一步，试试移动高亮的那块。&quot;;
+            } else {
+              hintTile = -1;
+              hintEl.textContent = &quot;提示 2／3：先归位第一行——把 1、2 摆好，再处理 3、4。&quot;;
+            }
+          }
+        } else {
+          hintTile = -1;
+          hintEl.textContent = &quot;提示 3／3：想知道“只换两块”为什么永远解不开，点“揭晓为什么”。&quot;;
+        }
+        render();
       });
 
       whyBtn.addEventListener(&quot;click&quot;, function () {
