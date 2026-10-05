@@ -1634,6 +1634,7 @@ html&gt;body{padding:0}&lt;/style&gt;
       &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;pz-shuffle&quot;&gt;换个能解的局面&lt;/button&gt;
       &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;pz-hint&quot;&gt;提示&lt;/button&gt;
       &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;pz-why-btn&quot; aria-pressed=&quot;false&quot;&gt;揭晓为什么&lt;/button&gt;
+      &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;pz-opt-btn&quot; aria-pressed=&quot;false&quot;&gt;最优解是怎么算出来的&lt;/button&gt;
     &lt;/div&gt;
   &lt;/div&gt;
 
@@ -1665,6 +1666,21 @@ html&gt;body{padding:0}&lt;/style&gt;
        “只差一次对换”的局面正好落在另一个陪集。&lt;/p&gt;
   &lt;/div&gt;
 
+  &lt;div class=&quot;text-small text-muted&quot; id=&quot;pz-opt&quot; hidden&gt;
+    &lt;p&gt;把&quot;局面&quot;看成图上的点、一次滑动看成一条边，从当前局面到目标局面的最短路径就是最优解。&lt;/p&gt;
+    &lt;ol&gt;
+      &lt;li&gt;直接广度优先（BFS）一定能得到最优解，但 4×4 的局面总数是 16!/2 ≈ 1.05×10¹³，全部展开不现实。&lt;/li&gt;
+      &lt;li&gt;所以用 A*：给每个局面算 f = g + h，g 是已经走的步数，h 是对&quot;还差多少步&quot;的估计，每次挑 f 最小的继续展开。&lt;/li&gt;
+      &lt;li&gt;h 必须&quot;乐观&quot;——永不高估真实步数。满足这一点时，A* 第一次碰到目标局面时的 g 就是最少步数。页面上用了两种经典乐观估计：
+          曼哈顿距离（每块到目标位置的横竖距离之和）和线性冲突（同一行或同一列里两块互相挡路时，至少要多绕 2 步）。&lt;/li&gt;
+      &lt;li&gt;页面只取这条最优路径的第一步当提示；每点一次提示都按当前局面重算，所以中间乱走也不会被带偏。&lt;/li&gt;
+      &lt;li&gt;想做&quot;查表&quot;式的版本，业界标准是 IDA* ＋ 模式数据库（pattern database）：把 15 块拆成几组（例如 1–7 和 8–15），
+          对每组单独搜出&quot;到目标状态的最少步数&quot;存成表；每个局面查表得到一个乐观下界，几张表加起来（或取最大）交给 IDA* 剪枝。
+          表越大越准，搜索越快。&lt;/li&gt;
+      &lt;li&gt;一句话：表提供乐观下界，搜索用下界剪枝，最优性由&quot;乐观&quot;保证。Korf 在 1985 年用这套方法算出了一批随机局面的最优解（平均 53 步左右）。&lt;/li&gt;
+    &lt;/ol&gt;
+  &lt;/div&gt;
+
   &lt;script&gt;
     (function () {
       var root = document.getElementById(&quot;puzzle-lab&quot;);
@@ -1679,7 +1695,6 @@ html&gt;body{padding:0}&lt;/style&gt;
       var board = SWAPPED.slice();
       var moves = 0;
       var best = null;
-      var hintStep = 0;
       var hintTile = -1;
 
       var gridEl = document.getElementById(&quot;pz-grid&quot;);
@@ -1690,6 +1705,8 @@ html&gt;body{padding:0}&lt;/style&gt;
       var hintEl = document.getElementById(&quot;pz-hint-text&quot;);
       var whyEl = document.getElementById(&quot;pz-why&quot;);
       var whyBtn = document.getElementById(&quot;pz-why-btn&quot;);
+      var optEl = document.getElementById(&quot;pz-opt&quot;);
+      var optBtn = document.getElementById(&quot;pz-opt-btn&quot;);
 
       function blankIndex(b) {
         return b.indexOf(0);
@@ -1887,7 +1904,6 @@ html&gt;body{padding:0}&lt;/style&gt;
       function setBoard(next) {
         board = next.slice();
         moves = 0;
-        hintStep = 0;
         hintTile = -1;
         hintEl.hidden = true;
         render();
@@ -1912,29 +1928,25 @@ html&gt;body{padding:0}&lt;/style&gt;
       });
 
       document.getElementById(&quot;pz-hint&quot;).addEventListener(&quot;click&quot;, function () {
-        hintStep = (hintStep % 3) + 1;
         hintEl.hidden = false;
-        if (hintStep === 1) {
+        if (!isSolvable(board)) {
           hintTile = -1;
-          hintEl.textContent = &quot;提示 1／3：先看右下角的“不变量”。目标局面是 1，当前是 &quot; +
-            invariant(board) + &quot;。能不能滑回去，看的就是这个数。&quot;;
-        } else if (hintStep === 2) {
-          if (!isSolvable(board)) {
-            hintTile = -1;
-            hintEl.textContent = &quot;提示 2／3：这个局面的不变量是 0，怎么滑都变不成 1——别硬练，点“换个能解的局面”。&quot;;
-          } else {
-            var first = solveFirstMove(board, 200000);
-            if (first !== null) {
-              hintTile = first;
-              hintEl.textContent = &quot;提示 2／3：这是某一条解法里的一步，试试移动高亮的那块。&quot;;
-            } else {
-              hintTile = -1;
-              hintEl.textContent = &quot;提示 2／3：先归位第一行——把 1、2 摆好，再处理 3、4。&quot;;
-            }
-          }
+          hintEl.textContent = &quot;这个局面滑不到目标。&quot;;
+          render();
+          return;
+        }
+        var first = solveFirstMove(board, 300000);
+        if (first === null) {
+          hintTile = -1;
+          hintEl.textContent = &quot;这步没算出来，随便动一格再点一次提示。&quot;;
         } else {
-          hintTile = -1;
-          hintEl.textContent = &quot;提示 3／3：想知道“只换两块”为什么永远解不开，点“揭晓为什么”。&quot;;
+          hintTile = first;
+          var blank = blankIndex(board);
+          var dir = first === blank - 4 ? &quot;往下滑&quot;
+            : first === blank + 4 ? &quot;往上滑&quot;
+            : first === blank - 1 ? &quot;往右滑&quot;
+            : &quot;往左滑&quot;;
+          hintEl.textContent = &quot;下一步：把 &quot; + board[first] + &quot; &quot; + dir + &quot;。&quot;;
         }
         render();
       });
@@ -1944,6 +1956,13 @@ html&gt;body{padding:0}&lt;/style&gt;
         whyEl.hidden = !open;
         whyBtn.setAttribute(&quot;aria-pressed&quot;, open ? &quot;true&quot; : &quot;false&quot;);
         whyBtn.className = &quot;btn&quot; + (open ? &quot; btn-primary&quot; : &quot;&quot;);
+      });
+
+      optBtn.addEventListener(&quot;click&quot;, function () {
+        var open = optEl.hidden;
+        optEl.hidden = !open;
+        optBtn.setAttribute(&quot;aria-pressed&quot;, open ? &quot;true&quot; : &quot;false&quot;);
+        optBtn.className = &quot;btn&quot; + (open ? &quot; btn-primary&quot; : &quot;&quot;);
       });
 
       render();
